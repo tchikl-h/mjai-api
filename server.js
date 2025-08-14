@@ -68,6 +68,37 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+app.post('/api/tts', async (req, res) => {
+  try {
+    const { voiceId, text, voice_settings } = req.body;
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg'
+      },
+      body: JSON.stringify({
+        text,
+        voice_settings: voice_settings || {
+          stability: 0.4,
+          similarity_boost: 0.9,
+          style: 0,
+          use_speaker_boost: true
+        }
+      })
+    });
+
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ error: 'TTS failed' });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
