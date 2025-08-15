@@ -91,6 +91,7 @@ app.post('/api/tts', async (req, res) => {
       },
       body: JSON.stringify({
         text,
+        model: 'eleven_flash_v2_5',
         voice_settings: voice_settings || {
           stability: 0.4,
           similarity_boost: 0.9,
@@ -105,6 +106,94 @@ app.post('/api/tts', async (req, res) => {
     res.send(buf);
   } catch (err) {
     res.status(500).json({ error: 'TTS failed' });
+  }
+});
+
+// Voice design endpoint
+app.post('/api/voice-design', async (req, res) => {
+  try {
+    const { 
+      voice_description, 
+      model_id,
+      text,
+      auto_generate_text,
+      loudness,
+      seed,
+      guidance_scale,
+      stream_previews,
+      quality,
+      reference_audio_base64,
+      prompt_strength
+    } = req.body;
+
+    // Check for required parameters
+    if (!voice_description) {
+      return res.status(400).json({ error: 'voice_description is required' });
+    }
+
+    // Validate voice_description length
+    if (voice_description.length < 20 || voice_description.length > 1000) {
+      return res.status(400).json({ 
+        error: 'voice_description must be between 20-1000 characters' 
+      });
+    }
+
+    // Check for API key
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
+      console.error('ELEVENLABS_API_KEY is not set in environment variables');
+      return res.status(500).json({ 
+        error: 'Server misconfiguration: ELEVENLABS_API_KEY missing' 
+      });
+    }
+
+    console.log(`Processing voice design request for description: "${voice_description.substring(0, 50)}..."`);
+
+    // Build request body with optional parameters
+    const requestBody = {
+      voice_description,
+      model_id: model_id || 'eleven_multilingual_ttv_v2',
+      auto_generate_text: auto_generate_text || false,
+      loudness: loudness !== undefined ? loudness : 0.5,
+      guidance_scale: guidance_scale !== undefined ? guidance_scale : 5
+    };
+
+    // Add optional parameters if provided
+    if (text) requestBody.text = text;
+    if (seed !== undefined) requestBody.seed = seed;
+    if (stream_previews !== undefined) requestBody.stream_previews = stream_previews;
+    if (quality !== undefined) requestBody.quality = quality;
+    if (reference_audio_base64) requestBody.reference_audio_base64 = reference_audio_base64;
+    if (prompt_strength !== undefined) requestBody.prompt_strength = prompt_strength;
+
+    const response = await fetch('https://api.elevenlabs.io/v1/text-to-voice/design', {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('ElevenLabs API error:', response.status, errorData);
+      return res.status(response.status).json({ 
+        error: `Voice design failed: ${response.statusText}`,
+        details: errorData
+      });
+    }
+
+    const result = await response.json();
+    console.log('Voice design completed successfully');
+    
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Voice design error:', error);
+    return res.status(500).json({ 
+      error: 'Voice design processing failed',
+      details: error.message 
+    });
   }
 });
 
@@ -198,5 +287,6 @@ app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
   console.log(`Chat endpoint available at http://localhost:${PORT}/api/chat`);
   console.log(`TTS endpoint available at http://localhost:${PORT}/api/tts`);
+  console.log(`Voice Design endpoint available at http://localhost:${PORT}/api/voice-design`);
   console.log(`STT endpoint available at http://localhost:${PORT}/api/stt`);
 });
