@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const { openai } = require('@ai-sdk/openai');
-const { generateText } = require('ai');
+const { streamText } = require('ai');
 
 // Load environment variables
 dotenv.config();
@@ -53,8 +53,8 @@ app.post('/api/chat', async (req, res) => {
     console.log('Creating OpenAI model...');
     const model = openai('gpt-4o', { apiKey });
 
-    console.log('Generating text...');
-    const { text } = await generateText({
+    console.log('Streaming text...');
+    const result = await streamText({
       model,
       system: playerDescription,
       prompt: mjMessage,
@@ -62,9 +62,22 @@ app.post('/api/chat', async (req, res) => {
       maxTokens: 150,
     });
 
-    console.log(`Response for ${playerName}:`, text);
+    // Set headers for Server-Sent Events
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
 
-    return res.status(200).json({ response: text });
+    console.log(`Streaming response for ${playerName}...`);
+
+    // Stream the response token by token
+    for await (const delta of result.textStream) {
+      res.write(`data: ${JSON.stringify({ token: delta })}\n\n`);
+    }
+
+    // Send end signal
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
   } catch (error) {
     console.error('Detailed error:', error);
     console.error('Error stack:', error?.stack || 'No stack trace');
