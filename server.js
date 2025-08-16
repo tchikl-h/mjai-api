@@ -28,16 +28,16 @@ app.post('/api/chat', async (req, res) => {
   try {
     console.log('Received request body:', req.body);
     
-    const { playerName, playerDescription, mjMessage } = req.body;
+    const { playerName, playerDescription, messages } = req.body;
 
-    if (!playerName || !playerDescription || !mjMessage) {
+    if (!playerName || !playerDescription || !messages) {
       console.log('Missing fields:', {
         playerName: !!playerName,
         playerDescription: !!playerDescription,
-        mjMessage: !!mjMessage,
+        messages: !!messages,
       });
       return res.status(400).json({ 
-        error: 'Missing required fields: playerName, playerDescription, mjMessage' 
+        error: 'Missing required fields: playerName, playerDescription, messages' 
       });
     }
 
@@ -57,7 +57,7 @@ app.post('/api/chat', async (req, res) => {
     const result = await streamText({
       model,
       system: playerDescription,
-      prompt: mjMessage,
+      messages: messages,
       temperature: 0.8,
       maxTokens: 150,
     });
